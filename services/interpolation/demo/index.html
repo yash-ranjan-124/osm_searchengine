@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Interpolation Demo</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+
+  <!-- jquery -->
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+
+  <!-- Load Leaflet from CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.1/leaflet.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.1/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-hash/0.2.1/leaflet-hash.min.js"></script>
+
+  <!-- Load geocoding plugin after Leaflet -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-geocoder-mapzen/1.7.1/leaflet-geocoder-mapzen.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-geocoder-mapzen/1.7.1/leaflet-geocoder-mapzen.js"></script>
+
+  <link rel="stylesheet" href="map.css">
+</head>
+<body>
+  <div id="map"></div>
+  <div id="controls">
+    <div class="leaflet-pelias-control leaflet-bar leaflet-control leaflet-pelias-expanded">
+      <input id="housenumber" type="text" min="1" max="1000" value="" />
+      <input id="streetname" disabled="disabled" value="" />
+      <input id="lat" type="hidden" />
+      <input id="lon" type="hidden" />
+    </div>
+  </div>
+  <script>
+    // Create a basic Leaflet map
+    var map = L.map('map', { zoomControl:false });
+    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    }).addTo(map);
+
+    // record position hash
+    var hash = new L.Hash(map);
+
+    var API_KEY = 'search-S0p1Seg';
+
+    // Add geocoding plugin
+    var params = {};
+    var options = { focus: false, expanded: true, params: params };
+    var geocoder = L.control.geocoder(API_KEY, options).addTo(map);
+    // map.locate({ setView: true, maxZoom: 16 });
+
+    var layer = {
+      lines: newSimpleStyleLayer().setZIndex(1).addTo(map),
+      points: newSimpleStyleLayer().setZIndex(2).addTo(map),
+      interpolated: newSimpleStyleLayer().setZIndex(3).addTo(map)
+    }
+
+    L.NumberedDivIcon = L.Icon.extend({
+      options: {
+        iconUrl: '<%= image_path("leaflet/marker_hole.png") %>',
+        number: '',
+        shadowUrl: null,
+        iconSize: new L.Point(25, 41),
+        iconAnchor: new L.Point(13, 41),
+        popupAnchor: new L.Point(0, -33),
+        /*
+        iconAnchor: (Point)
+        popupAnchor: (Point)
+        */
+        className: 'leaflet-div-icon'
+      },
+
+      createIcon: function () {
+        var div = document.createElement('div');
+        var img = this._createImg(this.options['iconUrl']);
+        var numdiv = document.createElement('div');
+        numdiv.setAttribute ( "class", "number" );
+        numdiv.innerHTML = this.options['number'] || '';
+        div.appendChild ( img );
+        div.appendChild ( numdiv );
+        this._setIconStyles(div, 'icon');
+        return div;
+      },
+
+      //you could change this to add a shadow like in the normal marker if you really wanted
+      createShadow: function () {
+        return null;
+      }
+    });
+
+    function reverse( latlng, cb ){
+      // use map center when latlng not supplied
+      if( !latlng ){ latlng = map.getCenter(); }
+
+      var qs =  '?point.lat=' + latlng.lat;
+          qs += '&point.lon=' + latlng.lng;
+          qs += '&sources=oa,osm';
+          qs += '&layers=address';
+          qs += '&size=1';
+          qs += '&api_key=' + API_KEY;
+
+      // find nearest street
+      $.ajax({
+        url: "https://search.mapzen.com/v1/reverse" + qs,
+        method: "GET",
+        dataType: "json",
+        traditional: true,
+        success: function( data, status, jqxhr ){
+          // console.log( "Request received:", data );
+          cb( null, data );
+        },
+        error: function( jqxhr, status, error ){
+          // console.log( "Something went wrong!" );
+          cb( error );
+        }
+      });
+    }
+
+    function extract( latlng, names, cb ){
+      // use map center when latlng not supplied
+      if( !latlng ){ latlng = map.getCenter(); }
+
+      $.ajax({
+        dataType: "json",
+        url: "/extract/geojson?lat="+latlng.lat+"&lon="+latlng.lng+"&names="+names.join(','),
+        success: function(data) {
+          // console.error( JSON.stringify( data, null, 2 ) );
+          cb( null, data );
+        }
+      }).error(function( err ) {
+        console.error( err );
+        cb( err );
+      });
+    }
+
+    function streetsNear( latlng, cb ){
+      $.ajax({
+        dataType: "json",
+        url: "/street/near/geojson?lat="+latlng.lat+"&lon="+latlng.lng,
+        success: function(data) {
+          // console.error( JSON.stringify( data, null, 2 ) );
+          cb( null, data );
+        }
+      }).error(function( err ) {
+        console.error( err );
+        cb( err );
+      });
+    }
+
+    function streetById( ids, cb ){
+      $.ajax({
+        dataType: "json",
+        url: "/street/"+ids.join(',')+"/geojson",
+        success: function(data) {
+          // console.error( JSON.stringify( data, null, 2 ) );
+          cb( null, data );
+        }
+      }).error(function( err ) {
+        console.error( err );
+        cb( err );
+      });
+    }
+
+    function interpolate( number, street, lat, lon, cb ){
+      $.ajax({
+        dataType: "json",
+        url: "/search/geojson?lat="+lat+"&lon="+lon+"&number="+number+"&street="+street,
+        success: function(data) {
+          // console.error( JSON.stringify( data, null, 2 ) );
+          cb( null, data );
+        }
+      }).error(function( err ) {
+        console.error( err );
+        cb( err );
+      });
+    }
+
+    function update( latlng ){
+
+      // use map center when latlng not supplied
+      if( !latlng ){ latlng = map.getCenter(); }
+
+      streetsNear( latlng, function( err, data ){
+
+        if( data && data.features.length ){
+
+          var centroid = latlng;
+          // var names = data.features.map( function( street ){
+          //   return street.properties.name;
+          // });
+          var names = [ data.features[0].properties.name ]; // only use first name
+
+          // $('#housenumber').val( data.features[0].properties.housenumber );
+          $('#streetname').val( data.features[0].properties.name );
+          $('#lon').val( data.features[0].geometry.coordinates[0][0] );
+          $('#lat').val( data.features[0].geometry.coordinates[0][1] );
+
+          extract( centroid, names, function( err2, data2 ){
+
+            console.error( err2, data2 );
+            layer.lines.clearLayers();
+            layer.points.clearLayers();
+            layer.interpolated.clearLayers();
+
+            if( !err2 && data2 && data2.features.length ){
+
+              // add extract geojson to layer
+              layer.points.addData( data2 );
+
+              var ids = [];
+              data2.features.forEach( function( feat ){
+                if( feat.properties.id && -1 === ids.indexOf( feat.properties.id ) ){
+                  ids.push( feat.properties.id );
+                }
+              });
+
+              streetById( ids, function( err3, data3 ){
+
+                console.error( err3, data3 );
+                if( !err3 && data3 ){
+
+                  // add street geojson to layer
+                  layer.lines.addData( data3 );
+
+                }
+              })
+            }
+          });
+        }
+      });
+    }
+
+    // map.on('moveend', function(e){ update() });
+    // map.on('resize', function(e){ update() });
+    map.on('click', function(e){ update( e.latlng ); });
+
+    // copied from lib/analyze.js
+    function housenumberFloatToString( f ){
+      if( 'number' !== typeof f ){ return ''; }
+
+      var suffix = '';
+      var fractional = Math.floor(( f % 1 ) * 100.1 /* add 0.1 to avoid floating point errors */ );
+      if( fractional > 0 && fractional <= 78 ){
+        switch( fractional ){
+          case 25: suffix = '¼'; break;
+          case 50: suffix = '½'; break;
+          case 74: suffix = '¾'; break;
+          default:
+            suffix = String.fromCharCode( 96 + Math.round( fractional / 3 ));
+        }
+      }
+
+      return '' + Math.floor( f ) + suffix;
+    }
+
+    $("#housenumber").keyup(function(){
+      var number = $('#housenumber').val();
+      var name = $('#streetname').val();
+      var lat = $('#lat').val();
+      var lon = $('#lon').val();
+
+      interpolate( number, name, lat, lon, function( err, data ){
+        layer.interpolated.clearLayers();
+        layer.interpolated.setZIndex(999);
+        if( !err && data ){
+          data.properties['marker-color'] = '#008000';
+          layer.interpolated.addData( data );
+        }
+      });
+    });
+
+    // create a geojson layer which supports the simplestyle spec
+    function newSimpleStyleLayer(){
+      return new L.GeoJSON( null, {
+        style: style,
+        pointToLayer: pointToLayer
+      });
+    }
+
+    function pointToLayer(f, latlon) {
+      var sizes = {
+        small: [20, 50],
+        medium: [30, 70],
+        large: [35, 90]
+      };
+      var fp = f.properties || {};
+      var size = fp['marker-size'] || 'medium';
+
+      var symbol = '';
+      // var symbol = (fp['marker-symbol']) ? '-' + fp['marker-symbol'] : '';
+      var color = fp['marker-color'] || '7e7e7e';
+      color = color.replace('#', '');
+
+      var url = 'http://a.tiles.mapbox.com/v3/marker/' +
+            'pin-' +
+            // Internet Explorer does not support the `size[0]` syntax.
+            size.charAt(0) + symbol + '+' + color +
+            ((window.devicePixelRatio === 2) ? '@2x' : '') +
+            '.png';
+
+      var table = '<table class="marker-properties"><tbody>';
+      for( var attr in f.properties ){
+        if( attr.match(/id/) ){ continue; }
+        if( attr.match(/marker/) ){ continue; }
+        if( f.properties[attr] === null || f.properties[attr] === undefined ){ continue; }
+        table += '<tr><th>' + attr + '</th><td>' + f.properties[attr] + '</td></tr>'
+      }
+      table += '</tbody></table>';
+
+      if( fp['source'] == 'VERTEX' ){
+        return new L.Marker(latlon, {
+          icon: new L.icon({
+            iconUrl: url,
+            iconSize: sizes[size],
+            iconAnchor: [sizes[size][0] / 2, sizes[size][1] / 2],
+            popupAnchor: [sizes[size][0] / 2, 0]
+          })
+        }).bindPopup(table);
+      } else {
+        return new L.Marker(latlon, {
+          icon:	new L.NumberedDivIcon({
+            number: housenumberFloatToString( parseFloat( fp['housenumber'] || fp['number'] ) ),
+            iconUrl: url
+          }),
+        }).bindPopup(table);
+      }
+    }
+
+    function style( f ){
+
+      if( f.properties.stroke ){
+        return {
+          weight: 2,
+          opacity: 1,
+          color: f.properties.stroke,
+          dashArray: 3
+        };
+      }
+
+      return {
+        weight: 3,
+        opacity: 1,
+        color: '#000080',
+        dashArray: 5
+      };
+    }
+  </script>
+</body>
+</html>

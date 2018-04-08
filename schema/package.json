@@ -1,0 +1,55 @@
+{
+  "name": "pelias-schema",
+  "version": "0.0.0-semantic-release",
+  "author": "mapzen",
+  "description": "Elasticsearch schema files and tooling for Pelias",
+  "homepage": "https://github.com/pelias/schema",
+  "license": "MIT",
+  "main": "schema.js",
+  "scripts": {
+    "test": "node test/run.js | tap-spec",
+    "integration": "node integration/run.js | tap-spec",
+    "create_index": "node scripts/create_index",
+    "drop_index": "node scripts/drop_index",
+    "reset_type": "node scripts/reset_type",
+    "update_settings": "node scripts/update_settings",
+    "travis": "npm run check-dependencies && npm run test",
+    "semantic-release": "semantic-release pre && npm publish && semantic-release post",
+    "check-dependencies": "node_modules/.bin/npm-check --production"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pelias/schema.git"
+  },
+  "keywords": [
+    "pelias",
+    "schema"
+  ],
+  "bugs": {
+    "url": "https://github.com/pelias/schema/issues"
+  },
+  "engines": {
+    "node": ">=4.0.0",
+    "npm": ">=1.4.3",
+    "elasticsearch": ">=1.1.1"
+  },
+  "dependencies": {
+    "colors": "^1.1.2",
+    "elasticsearch": "^13.3.1",
+    "joi": "^12.0.0",
+    "lodash.merge": "^4.6.0",
+    "pelias-config": "2.13.0"
+  },
+  "devDependencies": {
+    "difflet": "^1.0.1",
+    "elastictest": "^1.2.0",
+    "npm-check": "git://github.com/orangejulius/npm-check.git#disable-update-check",
+    "proxyquire": "^1.7.10",
+    "semantic-release": "^8.0.0",
+    "tap-spec": "^4.1.1",
+    "tape": "^4.5.0"
+  },
+  "pre-commit": [
+    "check-dependencies"
+  ]
+}

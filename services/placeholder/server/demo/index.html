@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en" ng-app="demo">
+  <head>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/async/2.1.4/async.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.3/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.3/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-hashchange/1.3/jquery.ba-hashchange.js"></script>
+
+    <style>
+      .wofinfo {
+        margin: 0;
+        padding: 0;
+        display: inline-block;
+      }
+      .wofabbr {
+        margin: 0 2px 0 5px;
+        padding: 0 5px;
+        background-color: #AAA;
+        color: #FFF;
+        font-size: 10px;
+        display: inline-block;
+      }
+      #tokens {
+        margin: 0;
+        padding: 0;
+        display: inline-block;
+      }
+      .wofinfo a {
+        font-size:9px;
+        padding: 2px;
+        padding-left: 0px;
+      }
+      .wofinfo em {
+        font-size:9px;
+        padding: 2px;
+        /*padding-right: 0px;*/
+        font-style: normal;
+      }
+    </style>
+
+    <script>
+      var style = {
+        stroke: true,
+        color: 'blue',
+        opacity: 0.5,
+        dashArray: '8, 5',
+        fillColor: 'blue',
+        fillOpacity: 0.0,
+        weight: 2
+      };
+
+      var order = [
+        'venue', 'address', 'building', 'campus', 'microhood', 'neighbourhood', 'macrohood', 'borough', 'postalcode',
+        'locality', 'metro area', 'localadmin', 'county', 'macrocounty', 'region', 'macroregion', 'marinearea', 'country', 'empire', 'continent', 'ocean', 'planet'
+      ];
+
+      function exec( args ){
+
+        $('#results').empty();
+        clearMap();
+
+        search( args, function( results ){
+          results = results || [];
+
+          // load token groups
+          tokenize( args, function( groups ){
+            groups = groups || [];
+
+            // render results
+            render( results, groups );
+          });
+        });
+      }
+
+      function renderResult( result ){
+
+        // the individual parts of the result hierarchy
+        var parts = [];
+
+        // the result document
+        parts.push({
+          id: result.id,
+          type: result.placetype,
+          name: result.name
+        })
+
+        // only render a single lineage
+        if( result.lineage.length ){
+          var lineage = result.lineage[0];
+          order.forEach( function( type ){
+            if( lineage.hasOwnProperty( type ) ){
+
+              // skip adding the result twice
+              if( lineage[type].id === result.id ){ return; }
+
+              parts.push({
+                id: lineage[type].id,
+                type: type,
+                name: lineage[type].name,
+                abbr: lineage[type].abbr
+              });
+            }
+          });
+        }
+
+        var view = parts.map( function( part, i ){
+          var v = Array(i).join('&nbsp;&nbsp;&nbsp;');
+          if( i > 0 ){ v += '└ '; }
+          v += '<strong>' + ( part.name || '??' ) + '</strong>';
+          if( part.abbr ){
+            v += '<div class="wofabbr">' + part.abbr + '</div>';
+          }
+          v += '<div class="wofinfo">';
+          v += '<em>' + ( part.type || '??' ) + '</em>';
+          v += '<a href="https://whosonfirst.mapzen.com/spelunker/id/' + ( part.id || '??' ) + '">' + ( part.id || '??' ) + '</a>';
+          v += '</div>';
+          return v;
+        })
+
+        // console.log( lins[i] );
+        $("#results").append('<li class="list-group-item"><span>' + view.join('<br />') + '</span></li>');
+      }
+
+      function render( results, groups ){
+
+        $('#results').empty();
+        $('#tokens').empty();
+        clearMap();
+
+        // display token groups
+        groups.forEach( function( win ){
+          var buttons = win.map( function( token ){
+            return '<li type="button" class="btn btn-default" style="margin-top: 5px;"><span>' + token + '</span></li>';
+          });
+          $("#tokens").html('<li><ul style="margin: 0; padding: 5px; padding-top: 0; list-style: none; background-color: #efefef; margin-bottom: 5px;">' + buttons.join('\n') + '</ul></li>' );
+        });
+
+        // render the results
+        _.each( results, renderResult );
+
+        // aggregate the bboxes
+        var bboxes =  _.compact( _.map( results, function( result ){
+          return result.geom.bbox;
+        }));
+
+        // change map location
+        updateMap( bboxes );
+      }
+
+      function request( url, params, cb ){
+        $.ajax({
+            url: url ,
+            method: 'GET',
+            data: params,
+            headers: { 'Accept': 'application/json' }
+          })
+          .done(cb);
+      };
+
+      function search( args, cb ){
+        console.info( 'search', args );
+
+        // get language from url hash
+        var hash = window.location.hash.substr(1);
+        if( hash && hash.length === 3 ){
+          args.lang = hash;
+        }
+
+        saveText( args.text );
+        request( '/parser/search', args, cb );
+      }
+
+      // function query( text, cb ){
+      //   console.info( 'query', text );
+      //   request( '/parser/query', { text: text }, cb );
+      // }
+
+      // function findbyid( ids, cb ){
+      //   console.info( 'findbyid', ids );
+      //   request( '/parser/findbyid', { ids: ids.join(',') }, cb );
+      // }
+
+      function tokenize( args, cb ){
+        console.info( 'tokenize', args );
+        request( '/parser/tokenize', args, cb );
+      }
+
+      function clearMap(){
+        document.layer.clearLayers()
+      }
+
+      function saveText( text ){
+        if( window.localStorage ){
+          window.localStorage.setItem( 'text', text );
+        }
+      }
+
+      function loadText(){
+        if( window.localStorage ){
+          var text = window.localStorage.getItem('text');
+          if( text ){ return text; }
+        }
+
+        // default text
+        return 'Example Street Neutral Bay North Sydney New South Wales 9999 AU';
+      }
+
+      function updateMap( bboxes ){
+
+        clearMap()
+
+        bboxes.forEach( function( bbox ){
+          var split = bbox.split(',');
+          var bounds = [[split[1], split[0]], [split[3], split[2]]];
+          var rect = L.rectangle(bounds, style);
+          rect.addTo(document.layer);
+        });
+
+        document.map.fitBounds( document.layer.getBounds() );
+      }
+
+      $(document).ready(function() {
+
+        var searchMode = function( e ){
+          exec({ text: $('#text').val() });
+          return false;
+        };
+
+        var liveMode = _.debounce( function( e ){
+          if( e.which === 13 ){ return false; } // not for enter key
+
+          var args = { text: $('#text').val() };
+
+          // live mode
+          if( $('#live').is(':checked') ){ args.mode = 'live'; }
+
+          exec( args );
+          return false;
+        }, 200 );
+
+        // button / keyup event handlers
+        $('#search').on( 'submit', searchMode );
+        $('#search').on( 'keyup', liveMode );
+
+        // checkbox change event handler
+        $('#live').change( function( e ) {
+
+          // enable/disable event handler
+          $('#search').off( 'keyup', liveMode );
+          if( e.target.checked ){
+            $('#search').on( 'keyup', liveMode );
+          }
+
+          refresh();
+          return false;
+        });
+
+        $('#go').on( 'click', function( e ){
+          $('#search').submit();
+          return false;
+        });
+
+        // create map
+        var map = L.map('map');
+        var tiles = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+        L.tileLayer( tiles, {
+          scrollWheelZoom: true,
+          zoomControl: true,
+          attributionControl: false,
+        }).addTo(map);
+
+        map.setView( new L.LatLng( 52.52, 13.40 ), 14 );
+
+        var bboxLayer = L.geoJson();
+        bboxLayer.addTo(map);
+
+        document.map = map;
+        document.layer = bboxLayer;
+
+        // trigger search on hash change
+        $(window).hashchange( function(){
+          $('#search').submit();
+        })
+
+        $('#text').val( loadText() );
+        $('#search').submit();
+      });
+    </script>
+
+  </head>
+  <body>
+
+    <div style="margin:20px;">
+
+      <form id="search" action="">
+        <div class="row">
+          <div class="col-md-6">
+
+            <div class="input-group">
+              <span class="input-group-addon">
+                <input id="live" type="checkbox" checked="checked" />
+              </span>
+              <input id="text" type="text" class="form-control" placeholder="Search for...">
+              <span class="input-group-btn">
+                <button id="go" class="btn btn-default" type="button">Parse!</button>
+              </span>
+            </div><!-- /input-group -->
+
+            <ul id="tokens" class="btn-group" role="group" style="margin-top:10px; list-style: none;"></ul>
+            <ul id="results" class="list-group" style="margin-top:10px;"></ul>
+          </div><!-- /.col-md-6 -->
+
+          <div class="col-md-6" style="">
+            <div id="map" style="width:100%; height:100%; height: 90vh;" />
+          </div><!-- /.col-md-6 -->
+        </div><!-- /.row -->
+      </form>
+
+    </div>
+
+  </body>
+</html>

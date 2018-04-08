@@ -1,0 +1,118 @@
+html, body {
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.no-webgl-message {
+  display: none;
+}
+
+html.no-webgl .no-webgl-message{
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  z-index: 1001; /* Ensures visibility in IE8 */
+  padding: 10px;
+  font-family: sans-serif;
+  background-color: lightyellow;
+  border-bottom: 1px solid gold;
+}
+
+table.marker-properties {
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 11px;
+  border: 1px solid #eee;
+  font: 12px/20px "Helvetica Neue",Arial,Helvetica,sans-serif;
+  color: #404040;
+  color: rgba(0,0,0,0.75);
+}
+
+table.marker-properties tr:nth-child(odd) {
+  background: #f7f7f7;
+}
+
+table.marker-properties td,
+table.marker-properties th {
+  padding: 5px;
+}
+
+table.marker-properties th {
+  font-weight: bold;
+}
+
+.leaflet-div-icon {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+.leaflet-div-icon img {
+  margin-left: -3px;
+  margin-top: 4px;
+}
+.leaflet-marker-icon .number{
+  position: relative;
+  top: -70px;
+  left: -5px;
+  font-size: 12px;
+  width: 34px;
+  text-align: center;
+  z-index: 1000;
+  font-weight: bold;
+  color: #fff;
+}
+
+#controls {
+  margin: 0; padding: 0; border: 0;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+#controls div {
+  margin: 0; padding: 0; border: 0;
+  width: 300px;
+}
+
+#controls #housenumber {
+  margin: 0; padding: 0; border: 0;
+  width: 50px;
+  height: 34px;
+  text-indent: 0px;
+  margin-left: 10px;
+  font-size: 26px;
+  border: none;
+  vertical-align: top;
+  padding-top: 6px;
+}
+
+#controls #streetname {
+  margin: 0; padding: 0; border: 0;
+  width: 230px;
+  height: 34px;
+  text-indent: 0px;
+  font-size: 26px;
+  vertical-align: top;
+  padding-top: 6px;
+  background-color: transparent;
+}
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+   opacity: 1;
+}
+
+textarea:focus, input:focus{
+  outline: none;
+}

@@ -1,0 +1,102 @@
+{
+  "esclient": {
+    "apiVersion": "2.4",
+    "keepAlive": true,
+    "requestTimeout": "120000",
+    "hosts": [{
+      "env": "development",
+      "protocol": "http",
+      "host": "localhost",
+      "port": 9200
+    }],
+    "log": [{
+      "type": "stdio",
+      "level": [ "error", "warning" ]
+    }]
+  },
+  "elasticsearch": {
+    "settings": {
+      "index": {
+        "number_of_replicas": "0",
+        "number_of_shards": "5",
+        "refresh_interval": "1m"
+      }
+    }
+  },
+  "interpolation": {
+    "client": {
+      "adapter": "null"
+    }
+  },
+  "dbclient": {
+    "statFrequency": 10000
+  },
+  "api": {
+    "accessLog": "common",
+    "textAnalyzer": "libpostal",
+    "host": "http://pelias.mapzen.com/",
+    "indexName": "pelias",
+    "version": "1.0",
+    "services": {
+      "placeholder": {
+        "url": "http://localhost:3000"
+      },
+      "pip": {
+        "url": "http://localhost:3101"
+      },
+      "libpostal": {
+        "url": "http://localhost:8080"
+      }
+    }
+  },
+  "schema": {
+    "indexName": "pelias"
+  },
+  "logger": {
+    "level": "debug",
+    "timestamp": true,
+    "colorize": true
+  },
+  "acceptance-tests": {
+    "endpoints": {
+      "local": "http://localhost:3100/v1/",
+      "dev-cached": "http://pelias.dev.mapzen.com.global.prod.fastly.net/v1/",
+      "dev": "http://pelias.dev.mapzen.com/v1/",
+      "prod": "http://search.mapzen.com/v1/",
+      "prod-uncached": "http://pelias.mapzen.com/v1/",
+      "prodbuild": "http://pelias.prodbuild.mapzen.com/v1/"
+    }
+  },
+  "imports": {
+    "adminLookup": {
+      "enabled": true,
+      "maxConcurrentRequests": 100
+    },
+    "geonames": {
+      "datapath": "/home/data/pelias/importers/geonames",
+      "countryCode": "IN"
+    },
+    "openstreetmap": {
+      "datapath": "/home/data/pelias/importers/openstreetmap",
+      "leveldbpath": "/home/data/pelias/importers/tmp",
+      "download": [{
+        "sourceURL": "https://download.geofabrik.de/asia/india-latest.osm.pbf"
+      }],
+      "import": [{
+        "filename": "india-latest.osm.pbf"
+      }]
+    },
+    "openaddresses": {
+      "datapath": "/home/data/pelias/importers/openaddresses",
+      "files": []
+    },
+    "polyline": {
+      "datapath": "/home/data/pelias/importers/polyline",
+      "files": []
+    },
+    "whosonfirst": {
+      "datapath": "/home/data/pelias/importers/whosonfirst",
+      "importVenues": false
+    }
+  }
+}

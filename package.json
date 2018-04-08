@@ -1,0 +1,17 @@
+{
+  "name": "jd_pelias_setup",
+  "version": "1.0.0",
+  "description": "pelias setup",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./api/index.js",
+    "init":"npm install"
+  },
+  "keywords": [
+    "pelias",
+    "geocoder"
+  ],
+  "author": "yash ranjan",
+  "license": "MIT"
+}

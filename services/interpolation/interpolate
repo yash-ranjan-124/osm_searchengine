@@ -1,0 +1,85 @@
+#!/bin/bash
+set -e;
+export LC_ALL=en_US.UTF-8;
+BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd );
+
+function help(){
+cat <<EOM
+  Usage: interpolate [command] [options]
+  Note: you will need to pipe data in to the import/conflate commands
+
+   help                                                                      output usage information
+   search [address_db] [street_db] [lat] [lon] [house_number] [street_name]  search database for specified housenumber + street
+   polyline [street_db]                                                      import polyline data in to [street_db]
+   oa [address_db] [street_db]                                               conflate oa csv file in to [address_db] using [street_db]
+   osm [address_db] [street_db]                                              conflate osm file in to [address_db] using [street_db]
+   tiger [address_db] [street_db]                                            conflate tiger address range geojson file in to [address_db] using [street_db]
+   vertices [address_db] [street_db]                                         compute fractional house numbers for line vertices
+   extract [address_db] [street_db] [lat] [lon] [street_name]                extract street address data for debugging purposes
+   server [address_db] [street_db]                                           start a web server
+
+   build                                                                     run the import script
+EOM
+}
+
+# trap SIGTERM and propogate to child process
+_term() {
+  echo "Caught SIGTERM signal!"
+  kill -TERM "$child" 2>/dev/null
+}
+trap _term SIGTERM
+
+# cli runner
+case "$1" in
+'help') help;;
+'search') node "$BASEDIR/cmd/search" "$2" "$3" "$4" "$5" "$6" "$7" &;;
+'polyline') cat -| node "$BASEDIR/cmd/polyline" "$2" &;;
+'oa') cat -| node "$BASEDIR/cmd/oa" "$2" "$3" &;;
+'osm') cat -| node "$BASEDIR/cmd/osm" "$2" "$3" &;;
+'tiger') cat -| node "$BASEDIR/cmd/tiger" "$2" "$3" &;;
+'vertices') node "$BASEDIR/cmd/vertices" "$2" "$3" &;;
+'extract') node "$BASEDIR/cmd/extract" "$2" "$3" "$4" "$5" "$6" &;;
+'server') node "$BASEDIR/cmd/server" "$2" "$3" &;;
+'build')
+
+  # validate all ENV vars are explicitly set
+  env_vars=( 'BUILDDIR' 'POLYLINE_FILE' 'OAPATH' 'TIGERPATH' 'PBF2JSON_BIN' 'PBF2JSON_FILE' )
+  for var_name in "${env_vars[@]}"; do
+    [ -z "${!var_name}" ] && echo "env var $var_name required" && exit 1;
+    export "${var_name}"; # export so child scripts can pick them up
+  done
+
+  # run polyline importer
+  /bin/bash $BASEDIR/script/import.sh &
+  child=$!; wait "$child";
+
+  # run openaddresses conflation
+  /bin/bash $BASEDIR/script/conflate_oa.sh &
+  child=$!; wait "$child";
+
+  # run openstreetmap conflation
+  /bin/bash $BASEDIR/script/conflate_osm.sh &
+  child=$!; wait "$child";
+
+  # run tiger conflation
+  /bin/bash $BASEDIR/script/conflate_tiger.sh &
+  child=$!; wait "$child";
+
+  # run vertex interpolation
+  /bin/bash $BASEDIR/script/vertices.sh &
+  ;;
+*)
+  help;;
+esac
+
+# wait for child process(es) to exit before exiting
+child=$!
+wait "$child" > /dev/null 2>&1
+
+# build example
+# BUILDDIR=/tmp/tempbuild \
+# POLYLINE_FILE=/data/polyline/berlin.polylines \
+# OAPATH=/data/oa/de \
+# PBF2JSON_BIN=/var/www/pelias/pbf2json/build/pbf2json.linux-x64 \
+# PBF2JSON_FILE=/data/extract/berlin-latest.osm.pbf \
+# ./interpolate build

@@ -1,0 +1,19 @@
+.properties | with_entries(
+  select( .key |
+    test("^wof:(id|name|placetype|hierarchy|parent_id|country_alpha3|abbreviation|superseded_by|label|population|megacity)$"),
+    test("^lbl:(bbox|latitude|longitude)$"),
+    test("^geom:(area|bbox|latitude|longitude)$"),
+    test("^iso:(country)$"),
+    test("^ne:(iso_a2|iso_a3|pop_est)$"),
+    test("^edtf:(deprecated)$"),
+    test("^mz:(is_current|population)$"),
+    test("^gn:(population|pop)$"),
+    test("^zs:(pop10)$"),
+    test("^qs:(pop|gn_pop)$"),
+    test("^wk:(population)$"),
+    test("^meso:(pop)$"),
+    test("^statoids:(population)$"),
+    test("^misc:(photo_sum)$"),
+    test("^name:")
+  )
+)

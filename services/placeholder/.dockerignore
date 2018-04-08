@@ -1,0 +1,9 @@
+.git
+node_modules
+.dockerignore
+.gitignore
+.gitattributes
+Dockerfile
+README.md
+data/wof.extract
+test/cases/generated.txt

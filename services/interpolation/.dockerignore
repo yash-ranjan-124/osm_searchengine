@@ -1,0 +1,9 @@
+node_modules
+play
+*.db
+*.db*
+*.err
+*.out
+*.skip
+todo.txt
+.git
